@@ -17,7 +17,9 @@ func AddHandlers(container *Container) {
 				Type: e.ApplicationCommandInteraction.Data.Type(),
 			}
 			if applicationCommand, exists := container.ApplicationCommands[key]; exists {
-				applicationCommand.Execute(container, e)
+				if err := applicationCommand.Execute(container, e); err != nil {
+					slog.Error(err.Error())
+				}
 				return
 			}
 		}
