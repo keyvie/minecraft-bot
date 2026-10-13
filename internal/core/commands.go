@@ -11,8 +11,11 @@ type ApplicationCommandKey struct {
 }
 
 type ApplicationCommand struct {
-	Data   	discord.ApplicationCommandCreate
-	Execute func(container *Container, event *events.ApplicationCommandInteractionCreate) error
+	Data    discord.ApplicationCommandCreate
+	Execute func(
+		container *Container,
+		event *events.ApplicationCommandInteractionCreate,
+	) error
 }
 
 func (c *ApplicationCommand) Key() ApplicationCommandKey {
@@ -21,7 +24,10 @@ func (c *ApplicationCommand) Key() ApplicationCommandKey {
 
 func NewApplicationCommand(
 	data discord.ApplicationCommandCreate,
-	execute func(container *Container, event *events.ApplicationCommandInteractionCreate) error,
+	execute func(
+		container *Container,
+		event *events.ApplicationCommandInteractionCreate,
+	) error,
 ) *ApplicationCommand {
 	return &ApplicationCommand{
 		Data:    data,

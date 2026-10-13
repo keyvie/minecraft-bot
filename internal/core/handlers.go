@@ -1,16 +1,31 @@
 package core
 
 import (
-	"fmt"
+	"log/slog"
 	"reflect"
 
 	"github.com/disgoorg/disgo/bot"
+	"github.com/disgoorg/disgo/events"
 )
 
 func AddHandlers(container *Container) {
 	container.Client.AddEventListeners(bot.NewListenerFunc(func(event bot.Event) {
+		switch e := event.(type) {
+		case *events.ApplicationCommandInteractionCreate:
+			key := ApplicationCommandKey{
+				Name: e.ApplicationCommandInteraction.Data.CommandName(),
+				Type: e.ApplicationCommandInteraction.Data.Type(),
+			}
+			if applicationCommand, exists := container.ApplicationCommands[key]; exists {
+				applicationCommand.Execute(container, e)
+				return
+			}
+		}
+
 		name := reflect.TypeOf(event).Elem().Name()
-		// Add logic which handles application commands
+		if name == "" {
+			return
+		}
 
 		for _, listener := range container.Listeners {
 			if listener.Name != name {
@@ -18,8 +33,8 @@ func AddHandlers(container *Container) {
 			}
 
 			if err := listener.Execute(container, event); err != nil {
-				fmt.Println(err.Error())
+				slog.Error(err.Error())
 			}
 		}
-	}))	
+	}))
 }

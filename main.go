@@ -3,8 +3,9 @@ package main
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log"
+	"log/slog"
+	"strings"
 	"time"
 	"os"
 	"os/signal"
@@ -26,6 +27,14 @@ import (
 func main() {
 	// Load env values from .env if it exists
 	_ = godotenv.Load()
+
+	// Setup logging
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	if strings.ToLower(os.Getenv("DEBUG")) == "true" {
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+	} else {
+		slog.SetLogLoggerLevel(slog.LevelInfo)
+	}
 
 	// Listen for signals to shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -76,6 +85,6 @@ func main() {
 	discordClient.Close(shutdownCtx)
 
 	if err := db.Close(); err != nil {
-		log.Println("Error closing database:", err)
+		slog.Error("Error closing database:", err)
 	}
 }
