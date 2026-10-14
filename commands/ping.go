@@ -9,6 +9,7 @@ import (
 	"github.com/disgoorg/omit"
 
 	"github.com/keyvie/minecraft-bot/internal/core"
+	"github.com/keyvie/minecraft-bot/internal/state"
 )
 
 var Ping = core.NewApplicationCommand(
@@ -18,7 +19,7 @@ var Ping = core.NewApplicationCommand(
 		DefaultMemberPermissions: omit.NewPtr(discord.PermissionAdministrator),
 	},
 	func(
-		c *core.Container,
+		c *core.Container[state.Public],
 		event *events.ApplicationCommandInteractionCreate,
 	) error {
 		gatewayLatency := c.Client.Gateway.Latency()

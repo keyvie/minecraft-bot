@@ -5,11 +5,11 @@ import (
 	"database/sql"
 	"log"
 	"log/slog"
-	"strings"
-	"time"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
@@ -18,10 +18,12 @@ import (
 	"github.com/joho/godotenv"
 	_ "modernc.org/sqlite"
 
+	"github.com/keyvie/minecraft-bot/commands"
 	"github.com/keyvie/minecraft-bot/internal/core"
 	"github.com/keyvie/minecraft-bot/internal/modules"
+	"github.com/keyvie/minecraft-bot/internal/rpc"
+	"github.com/keyvie/minecraft-bot/internal/state"
 	"github.com/keyvie/minecraft-bot/listeners"
-	"github.com/keyvie/minecraft-bot/commands"
 )
 
 func main() {
@@ -60,14 +62,31 @@ func main() {
 	}
 	//defer discordClient.Close(context.Background())
 
-	container := core.NewContainer(discordClient)
+	rpcClient := rpc.NewClient(rpc.WithReconnect(true), rpc.WithReconnectTimeout(30))
+	var secret string
+	if s, ok := os.LookupEnv("RPC_SECRET"); ok && s != "" {
+		secret = s
+	}
+	if err = rpcClient.Connect(ctx, os.Getenv("RPC_URL"), rpc.WithSecret(secret)); err != nil {
+		panic(err)
+	}
+
+	container := core.NewContainer(discordClient, core.WithState(*state.New(rpcClient)))
 	core.AddHandlers(container)
 
 	// Add all listeners
-	modules.Listeners.Add(container, listeners.Ready)
+	if err = modules.AddListeners(container, listeners.Ready); err != nil {
+		panic(err)
+	}
 
 	// Add all commands
-	modules.Commands.Add(container, commands.Ping)
+	if err = modules.AddCommands(container,
+		commands.Ping,
+		commands.RPC,
+		commands.Whitelist,
+	); err != nil {
+		panic(err)
+	}
 
 	// Open connection to Discord
 	if err = discordClient.OpenGateway(context.Background()); err != nil {
@@ -84,7 +103,11 @@ func main() {
 
 	discordClient.Close(shutdownCtx)
 
+	if err := rpcClient.Close(shutdownCtx); err != nil {
+		slog.Error("RPC", "Error closing", err)
+	}
+
 	if err := db.Close(); err != nil {
-		slog.Error("Error closing database:", err)
+		slog.Error("Database", "Error closing", err)
 	}
 }

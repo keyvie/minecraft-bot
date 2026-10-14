@@ -8,9 +8,10 @@ import (
 	"github.com/disgoorg/disgo/events"
 
 	"github.com/keyvie/minecraft-bot/internal/core"
+	"github.com/keyvie/minecraft-bot/internal/state"
 )
 
-var Ready = core.NewListener(func(container *core.Container, event *events.Ready) error {
+var Ready = core.NewListener(func(container *core.Container[state.Public], event *events.Ready) error {
 	slog.Info(fmt.Sprintf("Logged in as %s#%s (%s)", event.User.Username, event.User.Discriminator, event.User.ID))
 
 	commands := make([]discord.ApplicationCommandCreate, 0, len(container.ApplicationCommands))

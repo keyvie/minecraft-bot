@@ -2,14 +2,11 @@ package modules
 
 import (
 	"fmt"
-	
+
 	"github.com/keyvie/minecraft-bot/internal/core"
 )
 
-type listeners struct{}
-var Listeners = &listeners{}
-
-func (l *listeners) Add(container *core.Container, listener *core.Listener) error {
+func AddListener[S any](container *core.Container[S], listener *core.Listener[S]) error {
 	key := listener.Key()
 	if _, exists := container.Listeners[key]; exists {
 		return fmt.Errorf("listener for event %s with index %d already exists", key.Name, key.Index)
@@ -18,7 +15,16 @@ func (l *listeners) Add(container *core.Container, listener *core.Listener) erro
 	return nil
 }
 
-func (l *listeners) Remove(container *core.Container, key core.ListenerKey) error {
+func AddListeners[S any](container *core.Container[S], listeners ...*core.Listener[S]) error {
+	for _, listener := range listeners {
+		if err := AddListener(container, listener); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func RemoveListener[S any](container *core.Container[S], key core.ListenerKey) error {
 	if _, exists := container.Listeners[key]; !exists {
 		return fmt.Errorf("listener for event %s with index %d does not exist", key.Name, key.Index)
 	}
@@ -26,15 +32,15 @@ func (l *listeners) Remove(container *core.Container, key core.ListenerKey) erro
 	return nil
 }
 
-func (l *listeners) Get(container *core.Container, key core.ListenerKey) (*core.Listener, error) {
+func GetListener[S any](container *core.Container[S], key core.ListenerKey) (*core.Listener[S], error) {
 	if listener, exists := container.Listeners[key]; exists {
 		return listener, nil
 	}
 	return nil, fmt.Errorf("listener for event %s with index %d does not exist", key.Name, key.Index)
 }
 
-func (l *listeners) List(container *core.Container) []*core.Listener {
-	var listeners []*core.Listener
+func ListListeners[S any](container *core.Container[S]) []*core.Listener[S] {
+	listeners := make([]*core.Listener[S], 0, len(container.Listeners))
 	for _, listener := range container.Listeners {
 		listeners = append(listeners, listener)
 	}

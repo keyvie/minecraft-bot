@@ -10,26 +10,26 @@ type ApplicationCommandKey struct {
 	Name string
 }
 
-type ApplicationCommand struct {
+type ApplicationCommand[S any] struct {
 	Data    discord.ApplicationCommandCreate
 	Execute func(
-		container *Container,
+		container *Container[S],
 		event *events.ApplicationCommandInteractionCreate,
 	) error
 }
 
-func (c *ApplicationCommand) Key() ApplicationCommandKey {
+func (c *ApplicationCommand[S]) Key() ApplicationCommandKey {
 	return ApplicationCommandKey{Type: c.Data.Type(), Name: c.Data.CommandName()}
 }
 
-func NewApplicationCommand(
+func NewApplicationCommand[S any](
 	data discord.ApplicationCommandCreate,
 	execute func(
-		container *Container,
+		container *Container[S],
 		event *events.ApplicationCommandInteractionCreate,
 	) error,
-) *ApplicationCommand {
-	return &ApplicationCommand{
+) *ApplicationCommand[S] {
+	return &ApplicationCommand[S]{
 		Data:    data,
 		Execute: execute,
 	}

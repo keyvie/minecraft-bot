@@ -8,7 +8,7 @@ import (
 	"github.com/disgoorg/disgo/events"
 )
 
-func AddHandlers(container *Container) {
+func AddHandlers[S any](container *Container[S]) {
 	container.Client.AddEventListeners(bot.NewListenerFunc(func(event bot.Event) {
 		switch e := event.(type) {
 		case *events.ApplicationCommandInteractionCreate:
