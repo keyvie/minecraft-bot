@@ -48,7 +48,7 @@ func main() {
 	// Checks for database connection url
 	postgresUrl, exists := os.LookupEnv("POSTGRES_URL")
 	if !exists || postgresUrl == "" {
-		panic("DATABASE_PATH is not supported")
+		panic("POSTGRES_URL is not set")
 	}
 
 	pool, err := pgxpool.New(ctx, postgresUrl)
@@ -60,12 +60,15 @@ func main() {
 	}
 
 	// Check if args passes migrate
-	if len(os.Args) > 1 && os.Args[1] == "migrate" {
+	builtInMigrate := strings.ToLower(os.Getenv("MIGRATE"))
+	if (len(os.Args) > 1 && os.Args[1] == "migrate") || builtInMigrate == "true" {
 		db := stdlib.OpenDBFromPool(pool)
 		if err := database.Migrate(ctx, db); err != nil {
 			slog.Error("Migrate", "error", err.Error())
 		}
-		return
+		if builtInMigrate != "true" {
+			return
+		}
 	}
 
 	// Create all the repos

@@ -10,6 +10,5 @@ RUN adduser -D -u 10001 bot
 WORKDIR /app
 COPY --from=builder /app/minecraft-bot ./minecraft-bot
 USER bot
-# Run database migrations
-RUN ./minecraft-bot migrate up
+ENV MIGRATE="TRUE"
 ENTRYPOINT ["./minecraft-bot"]
