@@ -117,6 +117,7 @@ var Whitelist = core.NewApplicationCommand(
 			}
 
 			return event.CreateMessage(discord.MessageCreate{
+				Flags:   discord.MessageFlagEphemeral,
 				Content: fmt.Sprintf("Added %s to the whitelist", username),
 			})
 
@@ -168,6 +169,7 @@ var Whitelist = core.NewApplicationCommand(
 				}
 
 				return event.CreateMessage(discord.MessageCreate{
+					Flags:   discord.MessageFlagEphemeral,
 					Content: fmt.Sprintf("Removed %s from the whitelist", username),
 				})
 			}
@@ -241,6 +243,7 @@ var Whitelist = core.NewApplicationCommand(
 				}
 
 				return event.CreateMessage(discord.MessageCreate{
+					Flags:   discord.MessageFlagEphemeral,
 					Content: strings.Join(responseText, "\n\n"),
 				})
 			}
@@ -259,6 +262,7 @@ var Whitelist = core.NewApplicationCommand(
 			}
 
 			return event.CreateMessage(discord.MessageCreate{
+				Flags: discord.MessageFlagEphemeral,
 				Files: []*discord.File{
 					{
 						Name:   "response.json",

@@ -1,16 +1,17 @@
 package commands
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/omit"
 
 	"github.com/keyvie/minecraft-bot/internal/core"
+	"github.com/keyvie/minecraft-bot/internal/rpc"
 	"github.com/keyvie/minecraft-bot/internal/state"
 )
 
@@ -24,18 +25,23 @@ var Online = core.NewApplicationCommand(
 		c *core.Container[state.Public],
 		event *events.ApplicationCommandInteractionCreate,
 	) error {
-		resp, err := c.State.RPC.Call(context.Background(), "online")
+		resp, err := c.State.RPC.Call(context.Background(), "minecraft:players")
 		if err != nil {
 			return err
 		}
 
-		var pretty bytes.Buffer
-		if err := json.Indent(&pretty, resp.Result, "", "  "); err != nil {
-			return fmt.Errorf("failed to format RPC response: %w", err)
+		var players []rpc.Player
+		if err := json.Unmarshal(resp.Result, &players); err != nil {
+			return fmt.Errorf("invalid response: %w", err)
+		}
+
+		responseText := []string{"**Online Players**"}
+		for _, player := range players {
+			responseText = append(responseText, fmt.Sprintf("> **%s** (`%s`)", player.Name, player.ID))
 		}
 
 		if err := event.CreateMessage(discord.MessageCreate{
-			Content: pretty.String(),
+			Content: strings.Join(responseText, "\n"),
 		}); err != nil {
 			return err
 		}

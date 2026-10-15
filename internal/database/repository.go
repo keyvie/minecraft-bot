@@ -30,7 +30,7 @@ func (r *Repository[M]) Table() string {
 
 type Filter map[string]any
 
-func buildWhere(filter Filter) (string, []any) {
+func buildWhere(filter Filter, startIndex int) (string, []any) {
 	result := ""
 	args := make([]any, 0, len(filter))
 
@@ -42,7 +42,7 @@ func buildWhere(filter Filter) (string, []any) {
 			result += " WHERE "
 		}
 
-		result += `"` + key + `" = ?`
+		result += fmt.Sprintf(`"%s" = $%d`, key, startIndex+len(args))
 		args = append(args, value)
 		i++
 	}
@@ -70,7 +70,7 @@ func (r *Repository[M]) Create(ctx context.Context, model M) (pgconn.CommandTag,
 
 	placeholders := make([]string, len(columns))
 	for i := range placeholders {
-		placeholders[i] = "?"
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
 	}
 
 	query += fmt.Sprintf(
@@ -105,21 +105,19 @@ func (r *Repository[M]) Find(
 	args := make([]any, 0)
 
 	if len(opts.Where) > 0 {
-		where, whereArgs := buildWhere(opts.Where)
+		where, whereArgs := buildWhere(opts.Where, len(args)+1)
 		query += where
 		args = append(args, whereArgs...)
 	}
 
 	if opts.Limit > 0 {
-		query += " LIMIT ?"
 		args = append(args, opts.Limit)
-	} else if opts.Offset > 0 {
-		query += " LIMIT -1"
+		query += fmt.Sprintf(" LIMIT $%d", len(args))
 	}
 
 	if opts.Offset > 0 {
-		query += " OFFSET ?"
 		args = append(args, opts.Offset)
+		query += fmt.Sprintf(" OFFSET $%d", len(args))
 	}
 
 	rows, err := r.pool.Query(ctx, query, args...)
@@ -157,7 +155,7 @@ func (r *Repository[M]) FindOne(
 	args := make([]any, 0)
 
 	if len(opts.Where) > 0 {
-		where, whereArgs := buildWhere(opts.Where)
+		where, whereArgs := buildWhere(opts.Where, len(args)+1)
 		query += where
 		args = append(args, whereArgs...)
 	}
@@ -187,9 +185,7 @@ func (r *Repository[M]) FindOne(
 }
 
 type QueryDeleteOptions struct {
-	Where  Filter
-	Limit  int
-	Offset int
+	Where Filter
 }
 
 func (r *Repository[M]) Delete(
@@ -200,19 +196,9 @@ func (r *Repository[M]) Delete(
 	args := make([]any, 0)
 
 	if len(opts.Where) > 0 {
-		where, whereArgs := buildWhere(opts.Where)
+		where, whereArgs := buildWhere(opts.Where, len(args)+1)
 		query += where
 		args = append(args, whereArgs...)
-	}
-
-	if opts.Limit > 0 {
-		query += " LIMIT ?"
-		args = append(args, opts.Limit)
-	}
-
-	if opts.Offset > 0 {
-		query += " OFFSET ?"
-		args = append(args, opts.Offset)
 	}
 
 	return r.pool.Exec(ctx, query, args...)
