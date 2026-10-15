@@ -10,12 +10,9 @@ import (
 	"github.com/pressly/goose/v3"
 )
 
-//var embedMigrations embed.FS
-
 func Migrate(ctx context.Context, db *sql.DB) error {
-	//goose.SetBaseFS(embedMigrations)
 
-	if err := goose.SetDialect("sqlite3"); err != nil {
+	if err := goose.SetDialect("postgres"); err != nil {
 		return err
 	}
 
@@ -33,7 +30,7 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 
 	switch args[1] {
 	case "up":
-		return goose.UpContext(ctx, db, migrationsDir)
+		return goose.Up(db, migrationsDir)
 	case "create":
 		if len(args) < 3 {
 			return fmt.Errorf("usage: %s create <name>", args[0])

@@ -2,12 +2,10 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"log/slog"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -16,9 +14,9 @@ import (
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/gateway"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/joho/godotenv"
-	_ "modernc.org/sqlite"
 
 	"github.com/keyvie/minecraft-bot/commands"
 	"github.com/keyvie/minecraft-bot/internal/core"
@@ -47,34 +45,31 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Checks for custom database path
-	dbPath := "sqlite.db"
-	if customPath, ok := os.LookupEnv("DATABASE_PATH"); ok && customPath != "" {
-		dbPath = customPath
+	// Checks for database connection url
+	postgresUrl, exists := os.LookupEnv("POSTGRES_URL")
+	if !exists || postgresUrl == "" {
+		panic("DATABASE_PATH is not supported")
 	}
 
-	// Creates dir if not exists
-	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
-		panic(err)
-	}
-
-	// Open database connection
-	sqlDB, err := sql.Open("sqlite", dbPath)
+	pool, err := pgxpool.New(ctx, postgresUrl)
 	if err != nil {
 		panic(err)
 	}
-	db := sqlx.NewDb(sqlDB, "sqlite")
+	if err := pool.Ping(ctx); err != nil {
+		panic(err)
+	}
 
 	// Check if args passes migrate
 	if len(os.Args) > 1 && os.Args[1] == "migrate" {
-		if err := database.Migrate(ctx, sqlDB); err != nil {
+		db := stdlib.OpenDBFromPool(pool)
+		if err := database.Migrate(ctx, db); err != nil {
 			slog.Error("Migrate", "error", err.Error())
 		}
 		return
 	}
 
 	// Create all the repos
-	accountsRepo := database.NewRepository[models.Account](db, "accounts")
+	accountsRepo := database.NewRepository[models.Account](pool, "accounts")
 
 	// Open the discord client
 	discordClient, err := disgo.New(os.Getenv("DISCORD_TOKEN"),
@@ -124,7 +119,7 @@ func main() {
 	}
 
 	// Open connection to Discord
-	if err = discordClient.OpenGateway(context.Background()); err != nil {
+	if err = discordClient.OpenGateway(ctx); err != nil {
 		panic(err)
 	}
 
@@ -142,7 +137,5 @@ func main() {
 		slog.Error("RPC", "Error closing", err)
 	}
 
-	if err := db.Close(); err != nil {
-		slog.Error("Database", "Error closing", err)
-	}
+	pool.Close()
 }

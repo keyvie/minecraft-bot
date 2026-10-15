@@ -2,22 +2,24 @@ package database
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Repository[M any] struct {
-	db    *sqlx.DB
+	pool  *pgxpool.Pool
 	table string
 }
 
-func NewRepository[M any](db *sqlx.DB, table string) *Repository[M] {
+func NewRepository[M any](pool *pgxpool.Pool, table string) *Repository[M] {
 	return &Repository[M]{
-		db:    db,
+		pool:  pool,
 		table: table,
 	}
 }
@@ -48,8 +50,7 @@ func buildWhere(filter Filter) (string, []any) {
 	return result, args
 }
 
-func (r *Repository[M]) Create(ctx context.Context, model M) (sql.Result, error) {
-	var result sql.Result
+func (r *Repository[M]) Create(ctx context.Context, model M) (pgconn.CommandTag, error) {
 
 	query := fmt.Sprintf("INSERT INTO %q", r.table)
 	columns := []string{}
@@ -78,8 +79,7 @@ func (r *Repository[M]) Create(ctx context.Context, model M) (sql.Result, error)
 		strings.Join(placeholders, ", "),
 	)
 
-	result, err := r.db.ExecContext(ctx, query, args...)
-	return result, err
+	return r.pool.Exec(ctx, query, args...)
 }
 
 type QueryFindOptions struct {
@@ -122,11 +122,19 @@ func (r *Repository[M]) Find(
 		args = append(args, opts.Offset)
 	}
 
-	if err := r.db.SelectContext(ctx, &response.Items, query, args...); err != nil {
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
 		return response, err
 	}
 
-	response.Total = len(response.Items)
+	items, err := pgx.CollectRows(rows, pgx.RowToStructByName[M])
+	if err != nil {
+		return response, err
+	}
+	if len(items) > 0 {
+		response.Items = items
+		response.Total = len(items)
+	}
 	return response, nil
 }
 
@@ -156,15 +164,24 @@ func (r *Repository[M]) FindOne(
 
 	query += " LIMIT 1"
 
-	var items []M
-	if err := r.db.SelectContext(ctx, &items, query, args...); err != nil {
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
 		return response, err
 	}
 
-	if len(items) > 0 {
-		response.Item = items[0]
-		response.Found = true
+	item, err := pgx.CollectExactlyOneRow(
+		rows,
+		pgx.RowToStructByNameLax[M],
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return response, nil
+		}
+		return response, err
 	}
+
+	response.Item = item
+	response.Found = true
 
 	return response, nil
 }
@@ -178,7 +195,7 @@ type QueryDeleteOptions struct {
 func (r *Repository[M]) Delete(
 	ctx context.Context,
 	opts QueryDeleteOptions,
-) (sql.Result, error) {
+) (pgconn.CommandTag, error) {
 	query := "DELETE FROM " + `"` + r.table + `"`
 	args := make([]any, 0)
 
@@ -198,5 +215,5 @@ func (r *Repository[M]) Delete(
 		args = append(args, opts.Offset)
 	}
 
-	return r.db.ExecContext(ctx, query, args...)
+	return r.pool.Exec(ctx, query, args...)
 }
