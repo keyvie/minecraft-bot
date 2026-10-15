@@ -20,11 +20,21 @@ var Online = core.NewApplicationCommand(
 		Name:                     "online",
 		Description:              "Show online players",
 		DefaultMemberPermissions: omit.NewPtr(discord.PermissionsNone),
+		Options: []discord.ApplicationCommandOption{
+			discord.ApplicationCommandOptionBool{
+				Name:        "uuids",
+				Description: "Incide the UUIDs of the players",
+				Required:    false,
+			},
+		},
 	},
 	func(
 		c *core.Container[state.Public],
 		event *events.ApplicationCommandInteractionCreate,
 	) error {
+		data := event.SlashCommandInteractionData()
+		includeUUIDs := data.Bool("uuids")
+
 		resp, err := c.State.RPC.Call(context.Background(), "minecraft:players")
 		if err != nil {
 			return err
@@ -37,7 +47,11 @@ var Online = core.NewApplicationCommand(
 
 		responseText := []string{"**Online Players**"}
 		for _, player := range players {
-			responseText = append(responseText, fmt.Sprintf("> **%s** (`%s`)", player.Name, player.ID))
+			if includeUUIDs {
+				responseText = append(responseText, fmt.Sprintf("> **%s** (`%s`)", player.Name, player.ID))
+			} else {
+				responseText = append(responseText, fmt.Sprintf("> **%s**", player.Name))
+			}
 		}
 
 		if err := event.CreateMessage(discord.MessageCreate{
