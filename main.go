@@ -62,8 +62,12 @@ func main() {
 	// Check if args passes migrate
 	builtInMigrate := strings.ToLower(os.Getenv("MIGRATE"))
 	if (len(os.Args) > 1 && os.Args[1] == "migrate") || builtInMigrate == "true" {
+		args := os.Args[1:]
+		if builtInMigrate == "true" {
+			args = []string{"migrate", "up"}
+		}
 		db := stdlib.OpenDBFromPool(pool)
-		if err := database.Migrate(ctx, db); err != nil {
+		if err := database.Migrate(ctx, db, args); err != nil {
 			slog.Error("Migrate", "error", err.Error())
 		}
 		if builtInMigrate != "true" {

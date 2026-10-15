@@ -10,7 +10,7 @@ import (
 	"github.com/pressly/goose/v3"
 )
 
-func Migrate(ctx context.Context, db *sql.DB) error {
+func Migrate(ctx context.Context, db *sql.DB, args []string) error {
 
 	if err := goose.SetDialect("postgres"); err != nil {
 		return err
@@ -21,8 +21,6 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 	migrationsDir := filepath.Join(dir, "internal", "database", "migrations")
-
-	args := os.Args[1:]
 
 	if len(args) == 0 {
 		return fmt.Errorf("%s <up|create> [name]", args[0])
