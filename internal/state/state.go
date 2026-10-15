@@ -1,15 +1,26 @@
 package state
 
 import (
+	"github.com/keyvie/minecraft-bot/internal/database"
+	"github.com/keyvie/minecraft-bot/internal/database/models"
+	"github.com/keyvie/minecraft-bot/internal/mojang"
 	"github.com/keyvie/minecraft-bot/internal/rpc"
 )
 
-type Public struct {
-	RPC *rpc.Client
+type Repos struct {
+	Accounts *database.Repository[models.Account]
 }
 
-func New(rpc *rpc.Client) *Public {
+type Public struct {
+	RPC    *rpc.Client
+	Mojang *mojang.Client
+	Repos  Repos
+}
+
+func New(rpc *rpc.Client, m *mojang.Client, repos Repos) *Public {
 	return &Public{
-		RPC: rpc,
+		RPC:    rpc,
+		Repos:  repos,
+		Mojang: m,
 	}
 }

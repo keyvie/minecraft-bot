@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -15,12 +16,16 @@ import (
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/gateway"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
 	_ "modernc.org/sqlite"
 
 	"github.com/keyvie/minecraft-bot/commands"
 	"github.com/keyvie/minecraft-bot/internal/core"
+	"github.com/keyvie/minecraft-bot/internal/database"
+	"github.com/keyvie/minecraft-bot/internal/database/models"
 	"github.com/keyvie/minecraft-bot/internal/modules"
+	"github.com/keyvie/minecraft-bot/internal/mojang"
 	"github.com/keyvie/minecraft-bot/internal/rpc"
 	"github.com/keyvie/minecraft-bot/internal/state"
 	"github.com/keyvie/minecraft-bot/listeners"
@@ -42,12 +47,34 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// Checks for custom database path
+	dbPath := "sqlite.db"
+	if customPath, ok := os.LookupEnv("DATABASE_PATH"); ok && customPath != "" {
+		dbPath = customPath
+	}
+
+	// Creates dir if not exists
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
+		panic(err)
+	}
+
 	// Open database connection
-	db, err := sql.Open("sqlite", "database.db")
+	sqlDB, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		panic(err)
 	}
-	//defer db.Close()
+	db := sqlx.NewDb(sqlDB, "sqlite")
+
+	// Check if args passes migrate
+	if len(os.Args) > 1 && os.Args[1] == "migrate" {
+		if err := database.Migrate(ctx, sqlDB); err != nil {
+			slog.Error("Migrate", "error", err.Error())
+		}
+		return
+	}
+
+	// Create all the repos
+	accountsRepo := database.NewRepository[models.Account](db, "accounts")
 
 	// Open the discord client
 	discordClient, err := disgo.New(os.Getenv("DISCORD_TOKEN"),
@@ -62,6 +89,10 @@ func main() {
 	}
 	//defer discordClient.Close(context.Background())
 
+	// Create Monjang API Wrapper
+	mojangClient := mojang.NewClient()
+
+	// Create RPC client
 	rpcClient := rpc.NewClient(rpc.WithReconnect(true), rpc.WithReconnectTimeout(30))
 	var secret string
 	if s, ok := os.LookupEnv("RPC_SECRET"); ok && s != "" {
@@ -71,7 +102,10 @@ func main() {
 		panic(err)
 	}
 
-	container := core.NewContainer(discordClient, core.WithState(*state.New(rpcClient)))
+	state := state.New(rpcClient, mojangClient, state.Repos{
+		Accounts: accountsRepo,
+	})
+	container := core.NewContainer(discordClient, core.WithState(*state))
 	core.AddHandlers(container)
 
 	// Add all listeners
@@ -81,6 +115,7 @@ func main() {
 
 	// Add all commands
 	if err = modules.AddCommands(container,
+		commands.Online,
 		commands.Ping,
 		commands.RPC,
 		commands.Whitelist,

@@ -243,8 +243,8 @@ func (c *Client) run(ctx context.Context) {
 		}
 		var response Response
 		err = json.Unmarshal([]byte(message), &response)
+		slog.Debug("RPC: Message received", "message", string(message))
 		if err != nil {
-			slog.Debug("RPC: Message received", "message", string(message))
 			return
 		}
 		c.pendingMu.Lock()
@@ -253,7 +253,7 @@ func (c *Client) run(ctx context.Context) {
 		if exists {
 			ch <- response
 		}
-		slog.Info("RPC: Message received", "ID", response.ID, "JSONRPC", response.JSONRPC, "result", string(response.Result))
+		slog.Info("RPC: Message received", "ID", response.ID, "JSONRPC", response.JSONRPC, "result", response.Result.String())
 	}
 
 	c.Close(ctx)

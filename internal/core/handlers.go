@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	"github.com/disgoorg/disgo/bot"
+	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 )
 
@@ -18,7 +19,26 @@ func AddHandlers[S any](container *Container[S]) {
 			}
 			if applicationCommand, exists := container.ApplicationCommands[key]; exists {
 				if err := applicationCommand.Execute(container, e); err != nil {
-					slog.Error(err.Error())
+					message := discord.MessageCreate{
+						Content: "Error: " + err.Error(),
+						Flags:   discord.MessageFlagEphemeral,
+					}
+
+					if err := e.CreateMessage(message); err != nil {
+						_, followupErr := event.Client().Rest.UpdateInteractionResponse(
+							e.ApplicationID(),
+							e.Token(),
+							discord.MessageUpdate{
+								Content: &message.Content,
+							},
+						)
+						if followupErr != nil {
+							slog.Error("Failed to send error",
+								"initial", err,
+								"followup", followupErr,
+							)
+						}
+					}
 				}
 				return
 			}
